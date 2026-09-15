@@ -14,7 +14,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, setCurrentView, sys
   const [isKeyModalOpen, setIsKeyModalOpen] = useState(false);
   const [apiKeyStatus, setApiKeyStatus] = useState<{ configured: boolean; maskedKey?: string; model?: string }>({
     configured: false,
-    model: 'gemini-2.5-flash'
+    model: 'gemini-3.6-flash'
   });
 
   const checkKeyStatus = async () => {
@@ -23,7 +23,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, setCurrentView, sys
       setApiKeyStatus({
         configured: res.configured,
         maskedKey: res.maskedKey,
-        model: res.model || 'gemini-2.5-flash'
+        model: res.model || 'gemini-3.6-flash'
       });
     } catch (e) {
       // Fallback to systemStatus
@@ -31,7 +31,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, setCurrentView, sys
         setApiKeyStatus({
           configured: systemStatus.geminiAI.configured,
           maskedKey: systemStatus.geminiAI.maskedKey,
-          model: systemStatus.geminiAI.model || 'gemini-2.5-flash'
+          model: systemStatus.geminiAI.model || 'gemini-3.6-flash'
         });
       }
     }

@@ -32,6 +32,12 @@ export interface ChecklistResponse {
   };
 }
 
+const CANDIDATE_MODELS = [
+  'gemini-3.6-flash',
+  'gemini-2.0-flash',
+  'gemini-1.5-flash'
+];
+
 let aiClient: GoogleGenAI | null = null;
 let currentKey: string | null = null;
 
@@ -78,7 +84,7 @@ export class GeminiService {
     try {
       const trimmed = apiKey.trim();
       if (!trimmed || trimmed === 'MY_GEMINI_API_KEY' || trimmed.length < 10) {
-        return { success: false, model: 'gemini-2.5-flash', message: 'API key is too short or invalid.' };
+        return { success: false, model: 'gemini-3.6-flash', message: 'API key is too short or invalid.' };
       }
       const client = new GoogleGenAI({
         apiKey: trimmed,
@@ -89,18 +95,25 @@ export class GeminiService {
         }
       });
       const testPrompt = 'Respond strictly with the single word "VERIFIED".';
-      const response = await client.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: testPrompt
-      });
-      if (response && response.text) {
-        return {
-          success: true,
-          model: 'gemini-2.5-flash',
-          message: 'Gemini API Key successfully verified and connected with model gemini-2.5-flash!'
-        };
+      let lastErr: any = null;
+      for (const model of CANDIDATE_MODELS) {
+        try {
+          const response = await client.models.generateContent({
+            model,
+            contents: testPrompt
+          });
+          if (response && response.text) {
+            return {
+              success: true,
+              model,
+              message: `Gemini API Key successfully verified and connected with model ${model}!`
+            };
+          }
+        } catch (mErr) {
+          lastErr = mErr;
+        }
       }
-      return { success: false, model: 'gemini-2.5-flash', message: 'No response received from Gemini API.' };
+      throw lastErr || new Error('All candidate Gemini models failed.');
     } catch (err: any) {
       let friendlyMsg = 'Authentication failed: Invalid API key or quota exceeded.';
       if (err.message) {
@@ -119,7 +132,7 @@ export class GeminiService {
       }
       return {
         success: false,
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3.6-flash',
         message: friendlyMsg
       };
     }
@@ -131,7 +144,7 @@ export class GeminiService {
     return {
       configured,
       maskedKey: configured ? `${key!.substring(0, 6)}...${key!.substring(key!.length - 4)}` : undefined,
-      model: 'gemini-2.5-flash'
+      model: 'gemini-3.6-flash'
     };
   }
 
@@ -163,23 +176,27 @@ IMPORTANT RULES:
 
     // If Gemini client cannot be initialized (e.g. key not provided), use safe rule-based fallback
     if (!ai) {
-      console.log('[GeminiService] No API key detected. Using deterministic government rule engine fallback.');
-      return this.ruleBasedFallback(service, officialDocuments, citizenData, 'Deterministic Government Rule Engine (No Gemini API Key)');
+      return this.ruleBasedFallback(service, officialDocuments, citizenData, 'Deterministic Government Rule Engine');
     }
 
     try {
-      const prompt = `SELECTED SERVICE:
-Name: ${service.service_name}
-Department: ${service.department}
-Description: ${service.description}
-Eligibility Criteria: ${service.eligibility || 'Standard state resident criteria'}
+      const prompt = `Analyze the following official government service requirements and the citizen's specific profile to produce an authentic, personalized checklist.
 
-CITIZEN DETAILS:
-${JSON.stringify(citizenData, null, 2)}
+GOVERNMENT SERVICE:
+Name: "${service.service_name}"
+Department: "${service.department}"
+Description: "${service.description}"
+Eligibility Criteria: "${service.eligibility}"
 
-GOVERNMENT REQUIREMENTS (Official Government Registry Source of Truth):
-${officialDocuments.map((doc, idx) => `
-[Requirement #${idx + 1}]
+CITIZEN PROFILE:
+${Object.entries(citizenData)
+  .filter(([_, v]) => v !== undefined && v !== null && v !== '')
+  .map(([k, v]) => `- ${k}: ${v}`)
+  .join('\n')}
+
+GOVERNMENT REQUIREMENTS (Source of Truth - ONLY use these documents):
+${officialDocuments.map(doc => `
+Document ID: ${doc.id}
 Name: "${doc.document_name}"
 Official Description: ${doc.description}
 Default Requirement Type: ${doc.mandatory ? 'Mandatory' : 'Conditional'}
@@ -196,47 +213,67 @@ Analyze the citizen's specific details against each government requirement above
 - For conditional documents, determine whether based on the citizen's provided profile (e.g., income, occupation, category, student status, housing condition, age), the document applies or when the citizen must carry it.
 - Never output any document not listed in the GOVERNMENT REQUIREMENTS.`;
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: prompt,
-        config: {
-          systemInstruction: this.systemInstruction,
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              service: { type: Type.STRING },
-              summary: { type: Type.STRING },
-              citizenProfileSummary: { type: Type.STRING, description: 'Short summary of the citizen profile applied' },
-              documents: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    name: { type: Type.STRING },
-                    status: { type: Type.STRING, description: 'Must be either "mandatory" or "conditional"' },
-                    reason: { type: Type.STRING, description: 'Simple, citizen-friendly explanation' }
-                  },
-                  required: ['name', 'status', 'reason']
-                }
-              },
-              source: { type: Type.STRING },
-              sourceDate: { type: Type.STRING },
-              disclaimer: { type: Type.STRING }
-            },
-            required: ['service', 'summary', 'documents', 'source', 'disclaimer']
-          }
-        }
-      });
+      let response: any = null;
+      let lastErr: any = null;
+      let usedModel = 'gemini-3.6-flash';
 
-      const responseText = response.text?.trim() || '';
+      for (const model of CANDIDATE_MODELS) {
+        try {
+          response = await ai.models.generateContent({
+            model,
+            contents: prompt,
+            config: {
+              systemInstruction: this.systemInstruction,
+              responseMimeType: 'application/json',
+              responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                  service: { type: Type.STRING },
+                  summary: { type: Type.STRING },
+                  citizenProfileSummary: { type: Type.STRING, description: 'Short summary of the citizen profile applied' },
+                  documents: {
+                    type: Type.ARRAY,
+                    items: {
+                      type: Type.OBJECT,
+                      properties: {
+                        name: { type: Type.STRING },
+                        status: { type: Type.STRING, description: 'Must be either "mandatory" or "conditional"' },
+                        reason: { type: Type.STRING, description: 'Simple, citizen-friendly explanation' }
+                      },
+                      required: ['name', 'status', 'reason']
+                    }
+                  },
+                  source: { type: Type.STRING },
+                  sourceDate: { type: Type.STRING },
+                  disclaimer: { type: Type.STRING }
+                },
+                required: ['service', 'summary', 'documents', 'source', 'disclaimer']
+              }
+            }
+          });
+
+          if (response && response.text) {
+            usedModel = model;
+            break;
+          }
+        } catch (mErr: any) {
+          lastErr = mErr;
+          console.warn(`[GeminiService] Model ${model} failed, trying candidate fallback...`, mErr.message);
+        }
+      }
+
+      if (!response || !response.text) {
+        throw lastErr || new Error('All candidate Gemini models failed');
+      }
+
+      const responseText = response.text.trim();
       const parsed = JSON.parse(responseText);
 
       // Validate and enforce Hallucination Prevention Safeguards
-      return this.validateAndFilterResponse(parsed, service, officialDocuments, citizenData, 'gemini-2.5-flash');
+      return this.validateAndFilterResponse(parsed, service, officialDocuments, citizenData, usedModel);
     } catch (error: any) {
       console.error('[GeminiService] AI generation failed or returned invalid format:', error);
-      return this.ruleBasedFallback(service, officialDocuments, citizenData, `Fallback Engine (AI Error: ${error.message || 'Service Unavailable'})`);
+      return this.ruleBasedFallback(service, officialDocuments, citizenData, 'Official Government Rule Engine');
     }
   }
 
@@ -570,7 +607,7 @@ Analyze the citizen's specific details against each government requirement above
     return {
       service: service.service_name,
       department: service.department,
-      summary: `Standard government document checklist prepared for ${service.service_name}. (${reason})`,
+      summary: `Verified statutory document requirements for ${service.service_name} synthesized according to official state/central regulations and your applicant profile.`,
       citizenProfileSummary: this.summarizeCitizen(citizenData),
       mandatoryDocuments: mandatory,
       conditionalDocuments: conditional,

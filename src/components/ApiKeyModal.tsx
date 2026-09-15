@@ -16,7 +16,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onKey
     configured: boolean;
     maskedKey?: string;
     model?: string;
-  }>({ configured: false, model: 'gemini-2.5-flash' });
+  }>({ configured: false, model: 'gemini-3.6-flash' });
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
 
   useEffect(() => {
@@ -32,7 +32,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onKey
       setStatus({
         configured: res.configured,
         maskedKey: res.maskedKey,
-        model: res.model || 'gemini-2.5-flash'
+        model: res.model || 'gemini-3.6-flash'
       });
       if (res.configured && res.maskedKey) {
         setApiKeyInput('');
@@ -50,7 +50,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onKey
     }
 
     setIsTesting(true);
-    setMessage({ text: 'Testing API key with Gemini 2.5 Flash model...', type: 'info' });
+    setMessage({ text: 'Testing API key with Gemini 3.6 Flash model...', type: 'info' });
 
     try {
       const res = await apiService.saveApiKey(apiKeyInput.trim());
@@ -83,7 +83,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onKey
     try {
       await apiService.removeApiKey();
       localStorage.removeItem('gemini_api_key');
-      setStatus({ configured: false, model: 'gemini-2.5-flash' });
+      setStatus({ configured: false, model: 'gemini-3.6-flash' });
       setMessage({
         text: 'API Key disconnected. System will use the official deterministic government rule engine.',
         type: 'info'
@@ -114,7 +114,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onKey
               </div>
               <div>
                 <h3 className="text-lg font-bold tracking-tight">Connect Gemini API Key</h3>
-                <p className="text-xs text-slate-300 mt-0.5">Google GenAI SDK (gemini-2.5-flash)</p>
+                <p className="text-xs text-slate-300 mt-0.5">Google GenAI SDK (gemini-3.6-flash)</p>
               </div>
             </div>
             <button

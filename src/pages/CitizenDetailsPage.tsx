@@ -69,15 +69,60 @@ export const CitizenDetailsPage: React.FC<CitizenDetailsPageProps> = ({
       if (typeof e.stopPropagation === 'function') e.stopPropagation();
     }
     
-    // Construct sanitized complete data with intelligent defaults
+    const newErrors: Record<string, string> = {};
+
+    // 1. Full Legal Name Validation
+    if (!formData.name || !formData.name.trim()) {
+      newErrors.name = 'Please enter the applicant full legal name.';
+    }
+
+    // 2. Age Validation
+    if (formData.age === '' || formData.age === undefined || isNaN(Number(formData.age))) {
+      newErrors.age = 'Please enter applicant age in years.';
+    } else if (Number(formData.age) < 0 || Number(formData.age) > 125) {
+      newErrors.age = 'Please enter a valid age between 0 and 125.';
+    }
+
+    // 3. District Validation
+    if (!formData.district || !formData.district.trim()) {
+      newErrors.district = 'Please enter your district (e.g., Chennai, Coimbatore, Salem, Erode).';
+    }
+
+    // 4. Service-specific required fields
+    if (service.id === 1) { // Income Certificate
+      if (formData.annualIncome === '' || formData.annualIncome === undefined || isNaN(Number(formData.annualIncome))) {
+        newErrors.annualIncome = 'Please enter your gross annual household income.';
+      }
+    }
+
+    if (service.id === 2 || service.id === 27) { // Residence / Domicile
+      if (formData.yearsOfResidence === '' || formData.yearsOfResidence === undefined) {
+        newErrors.yearsOfResidence = 'Please enter the number of years residing in the state/district.';
+      }
+    }
+
+    if (service.id === 3 || service.id === 51) { // Scholarship
+      if (!formData.courseName || !formData.courseName.trim()) {
+        newErrors.courseName = 'Please enter your enrolled course / degree name.';
+      }
+    }
+
+    // If validation fails, display error messages and scroll to top
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      window.scrollTo({ top: 150, behavior: 'smooth' });
+      return;
+    }
+
+    setErrors({});
+
+    // Construct sanitized complete data
     const sanitizedData: CitizenFormData = {
       ...formData,
-      name: formData.name && formData.name.trim() ? formData.name.trim() : 'Citizen Applicant',
-      age: formData.age !== '' && formData.age !== undefined && !isNaN(Number(formData.age)) 
-        ? Number(formData.age) 
-        : (service.id === 6 ? 65 : 25),
+      name: formData.name.trim(),
+      age: Number(formData.age),
       state: formData.state || 'Tamil Nadu',
-      district: formData.district && formData.district.trim() ? formData.district.trim() : 'General District Jurisdiction',
+      district: formData.district.trim(),
       occupation: formData.occupation || (service.id === 3 ? 'Student / Dependent' : 'Salaried Employee (Private/Govt)'),
       annualIncome: formData.annualIncome !== '' && formData.annualIncome !== undefined && !isNaN(Number(formData.annualIncome))
         ? Number(formData.annualIncome)
@@ -2644,6 +2689,14 @@ export const CitizenDetailsPage: React.FC<CitizenDetailsPageProps> = ({
             We do not collect or store biometric data or sensitive identifiers. Data is exclusively analyzed in real-time against official government documentation rules.
           </p>
         </div>
+
+        {/* Validation Warning Alert above button */}
+        {Object.keys(errors).length > 0 && (
+          <div className="p-3.5 bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-xl flex items-center gap-2.5 font-semibold">
+            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+            <span>Please fill in the required applicant details marked with * above before generating your checklist.</span>
+          </div>
+        )}
 
         {/* Action Button */}
         <div className="pt-2">

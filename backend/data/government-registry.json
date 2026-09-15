@@ -4390,6 +4390,21 @@
         "purpose": "Official Application"
       },
       "created_at": "2026-09-15T06:41:57.007Z"
+    },
+    {
+      "id": 80,
+      "service_id": 1,
+      "citizen_data": {
+        "name": "Muthusamy K",
+        "age": 42,
+        "state": "Tamil Nadu",
+        "district": "Erode",
+        "occupation": "Self-Employed / Business",
+        "annualIncome": 240000,
+        "category": "OBC",
+        "purpose": "Government Subsidy Welfare Scheme Application"
+      },
+      "created_at": "2026-09-15T08:31:55.766Z"
     }
   ],
   "ai_results": [
@@ -15028,6 +15043,142 @@
       },
       "model_name": "Government Rule Engine (Deterministic)",
       "created_at": "2026-09-15T06:41:57.010Z"
+    },
+    {
+      "id": 80,
+      "request_id": 80,
+      "generated_result": {
+        "service": "Income Certificate",
+        "department": "Department of Revenue & Disaster Management",
+        "summary": "Verified statutory document requirements for Income Certificate synthesized according to official state/central regulations and your applicant profile.",
+        "citizenProfileSummary": "Citizen: Muthusamy K | Age: 42 yrs | District: Erode | Occupation: Self-Employed / Business | Annual Income: ₹240,000 | Category: OBC | Purpose: Government Subsidy Welfare Scheme Application",
+        "mandatoryDocuments": [
+          {
+            "id": 101,
+            "name": "Aadhaar Card",
+            "status": "mandatory",
+            "reason": "Required for identity and statutory verification: Government-issued 12-digit biometrically linked unique identity card of the applicant.",
+            "officialDescription": "Government-issued 12-digit biometrically linked unique identity card of the applicant.",
+            "conditionRule": null,
+            "source": "National e-Governance Division (NeGD)"
+          },
+          {
+            "id": 102,
+            "name": "Address Proof (Ration Card or Voter ID)",
+            "status": "mandatory",
+            "reason": "Required for identity and statutory verification: Document verifying that the applicant resides in the territorial jurisdiction of the issuing authority.",
+            "officialDescription": "Document verifying that the applicant resides in the territorial jurisdiction of the issuing authority.",
+            "conditionRule": null,
+            "source": "National e-Governance Division (NeGD)"
+          },
+          {
+            "id": 103,
+            "name": "Income Proof (Salary Slip / Form 16 / IT Return)",
+            "status": "mandatory",
+            "reason": "Required for identity and statutory verification: Documentary proof of earnings such as recent 3-month payslip for salaried persons or Income Tax Return assessment.",
+            "officialDescription": "Documentary proof of earnings such as recent 3-month payslip for salaried persons or Income Tax Return assessment.",
+            "conditionRule": null,
+            "source": "Department of Revenue & Disaster Management Manual"
+          },
+          {
+            "id": 104,
+            "name": "Bank Passbook Statement (6 Months)",
+            "status": "mandatory",
+            "reason": "Based on your stated income (₹240,000), bank account transaction proof is required.",
+            "officialDescription": "Bank account statement showing transaction flow and average monthly credits.",
+            "conditionRule": "Required when applicant is self-employed, daily wage earner, agricultural worker, or when annual income exceeds threshold limits without formal salary slips.",
+            "source": "Revenue Department Circular 2026-Rev/B"
+          },
+          {
+            "id": 105,
+            "name": "Affidavit of Non-Salaried Income",
+            "status": "mandatory",
+            "reason": "Required as you indicated \"Self-Employed / Business\" without standard salary certificates.",
+            "officialDescription": "Self-declaration notarized on non-judicial stamp paper stating annual household income from informal sources.",
+            "conditionRule": "Required only if the applicant does not have salary slips or IT returns to substantiate unorganized sector income.",
+            "source": "State Revenue Manual Section 4(c)"
+          },
+          {
+            "id": 106,
+            "name": "Caste Certificate",
+            "status": "mandatory",
+            "reason": "Required because you indicated social category \"OBC\" for affirmative benefits/exemptions.",
+            "officialDescription": "Community certificate proving social category.",
+            "conditionRule": "Required only when seeking fee waiver or concessional processing under SC/ST/OBC category provisions.",
+            "source": "Revenue Department Guidelines"
+          }
+        ],
+        "conditionalDocuments": [],
+        "allDocuments": [
+          {
+            "id": 101,
+            "name": "Aadhaar Card",
+            "status": "mandatory",
+            "reason": "Required for identity and statutory verification: Government-issued 12-digit biometrically linked unique identity card of the applicant.",
+            "officialDescription": "Government-issued 12-digit biometrically linked unique identity card of the applicant.",
+            "conditionRule": null,
+            "source": "National e-Governance Division (NeGD)"
+          },
+          {
+            "id": 102,
+            "name": "Address Proof (Ration Card or Voter ID)",
+            "status": "mandatory",
+            "reason": "Required for identity and statutory verification: Document verifying that the applicant resides in the territorial jurisdiction of the issuing authority.",
+            "officialDescription": "Document verifying that the applicant resides in the territorial jurisdiction of the issuing authority.",
+            "conditionRule": null,
+            "source": "National e-Governance Division (NeGD)"
+          },
+          {
+            "id": 103,
+            "name": "Income Proof (Salary Slip / Form 16 / IT Return)",
+            "status": "mandatory",
+            "reason": "Required for identity and statutory verification: Documentary proof of earnings such as recent 3-month payslip for salaried persons or Income Tax Return assessment.",
+            "officialDescription": "Documentary proof of earnings such as recent 3-month payslip for salaried persons or Income Tax Return assessment.",
+            "conditionRule": null,
+            "source": "Department of Revenue & Disaster Management Manual"
+          },
+          {
+            "id": 104,
+            "name": "Bank Passbook Statement (6 Months)",
+            "status": "mandatory",
+            "reason": "Based on your stated income (₹240,000), bank account transaction proof is required.",
+            "officialDescription": "Bank account statement showing transaction flow and average monthly credits.",
+            "conditionRule": "Required when applicant is self-employed, daily wage earner, agricultural worker, or when annual income exceeds threshold limits without formal salary slips.",
+            "source": "Revenue Department Circular 2026-Rev/B"
+          },
+          {
+            "id": 105,
+            "name": "Affidavit of Non-Salaried Income",
+            "status": "mandatory",
+            "reason": "Required as you indicated \"Self-Employed / Business\" without standard salary certificates.",
+            "officialDescription": "Self-declaration notarized on non-judicial stamp paper stating annual household income from informal sources.",
+            "conditionRule": "Required only if the applicant does not have salary slips or IT returns to substantiate unorganized sector income.",
+            "source": "State Revenue Manual Section 4(c)"
+          },
+          {
+            "id": 106,
+            "name": "Caste Certificate",
+            "status": "mandatory",
+            "reason": "Required because you indicated social category \"OBC\" for affirmative benefits/exemptions.",
+            "officialDescription": "Community certificate proving social category.",
+            "conditionRule": "Required only when seeking fee waiver or concessional processing under SC/ST/OBC category provisions.",
+            "source": "Revenue Department Guidelines"
+          }
+        ],
+        "source": "National e-Governance Division (NeGD) Citizen Services Portal",
+        "sourceDate": "2026-08-15",
+        "disclaimer": "Requirements are based on the available government information in the system database. Please verify latest guidelines before application submission.",
+        "aiGenerated": false,
+        "modelName": "Government Rule Engine (Deterministic)",
+        "hallucinationAudit": {
+          "totalOfficialDocs": 6,
+          "aiProposedDocs": 6,
+          "unsupportedDocsFiltered": [],
+          "passedValidation": true
+        }
+      },
+      "model_name": "Government Rule Engine (Deterministic)",
+      "created_at": "2026-09-15T08:31:55.796Z"
     }
   ]
 }
