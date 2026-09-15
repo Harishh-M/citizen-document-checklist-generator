@@ -1,0 +1,6 @@
+{
+  "name": "Citizen Document Checklist Generator",
+  "description": "AI-powered government citizen application document checklist generator (GOV-23) analyzing service requirements and citizen details with strict hallucination prevention.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
