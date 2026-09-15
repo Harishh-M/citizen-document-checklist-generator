@@ -203,6 +203,7 @@ export default function App() {
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
         systemStatus={systemStatus}
+        onRefreshStatus={fetchData}
       />
 
       {/* Global Error Banner */}

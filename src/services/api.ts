@@ -9,7 +9,32 @@ const apiClient = axios.create({
   timeout: 30000
 });
 
+// Attach local API key header if available in browser storage
+apiClient.interceptors.request.use((config) => {
+  const localKey = localStorage.getItem('gemini_api_key');
+  if (localKey && !config.headers['x-gemini-api-key']) {
+    config.headers['x-gemini-api-key'] = localKey;
+  }
+  return config;
+});
+
 export const apiService = {
+  // API Key Management
+  async getApiKeyStatus(): Promise<{ success: boolean; configured: boolean; maskedKey?: string; model: string }> {
+    const res = await apiClient.get('/admin/api-key');
+    return res.data;
+  },
+
+  async saveApiKey(apiKey: string): Promise<{ success: boolean; message: string; configured: boolean; maskedKey?: string; model: string }> {
+    const res = await apiClient.post('/admin/api-key', { apiKey });
+    return res.data;
+  },
+
+  async removeApiKey(): Promise<{ success: boolean; message: string; configured: boolean; model: string }> {
+    const res = await apiClient.delete('/admin/api-key');
+    return res.data;
+  },
+
   // Services
   async getServices(): Promise<Service[]> {
     const res = await apiClient.get('/services');

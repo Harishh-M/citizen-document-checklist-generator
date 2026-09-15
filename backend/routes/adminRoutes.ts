@@ -6,7 +6,10 @@ import {
   updateDocument,
   deleteDocument,
   resetDatabase,
-  getSystemStatus
+  getSystemStatus,
+  getApiKeyStatus,
+  saveApiKey,
+  removeApiKey
 } from '../controllers/adminController.js';
 
 const router = Router();
@@ -14,6 +17,11 @@ const router = Router();
 // System health & config
 router.get('/status', getSystemStatus);
 router.post('/reset', resetDatabase);
+
+// Gemini API Key management
+router.get('/api-key', getApiKeyStatus);
+router.post('/api-key', saveApiKey);
+router.delete('/api-key', removeApiKey);
 
 // Services management
 router.post('/services', createService);
@@ -25,3 +33,4 @@ router.put('/documents/:id', updateDocument);
 router.delete('/documents/:id', deleteDocument);
 
 export default router;
+

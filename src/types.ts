@@ -7,6 +7,7 @@ export interface Service {
   procedure_steps: string;
   source: string;
   last_updated: string;
+  jurisdiction?: 'State' | 'Central' | 'State/Central';
   created_at?: string;
 }
 

@@ -30,11 +30,15 @@ export async function generateChecklist(req: Request, res: Response, next: NextF
     // 3. Persist citizen request in citizen_requests table
     const requestId = await db.saveCitizenRequest(numServiceId, citizenData);
 
+    // Read optional client-provided API key from header or body
+    const overrideApiKey = (req.headers['x-gemini-api-key'] as string) || req.body.apiKey;
+
     // 4. Invoke Gemini AI Analysis with strict hallucination safeguards
     const checklistResult = await GeminiService.analyzeChecklist(
       service,
       officialDocuments,
-      citizenData
+      citizenData,
+      overrideApiKey
     );
 
     // 5. Persist the generated AI result in ai_results table

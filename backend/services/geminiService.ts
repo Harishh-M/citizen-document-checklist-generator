@@ -33,13 +33,15 @@ export interface ChecklistResponse {
 }
 
 let aiClient: GoogleGenAI | null = null;
+let currentKey: string | null = null;
 
-function getGenAIClient(): GoogleGenAI | null {
-  const apiKey = process.env.GEMINI_API_KEY;
+function getGenAIClient(overrideKey?: string): GoogleGenAI | null {
+  const apiKey = overrideKey || process.env.GEMINI_API_KEY;
   if (!apiKey || apiKey === 'MY_GEMINI_API_KEY' || apiKey.trim() === '') {
     return null;
   }
-  if (!aiClient) {
+  if (!aiClient || currentKey !== apiKey) {
+    currentKey = apiKey;
     aiClient = new GoogleGenAI({
       apiKey,
       httpOptions: {
@@ -53,6 +55,86 @@ function getGenAIClient(): GoogleGenAI | null {
 }
 
 export class GeminiService {
+  public static setApiKey(newKey: string): void {
+    process.env.GEMINI_API_KEY = newKey.trim();
+    currentKey = newKey.trim();
+    aiClient = new GoogleGenAI({
+      apiKey: newKey.trim(),
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build'
+        }
+      }
+    });
+  }
+
+  public static disconnectApiKey(): void {
+    process.env.GEMINI_API_KEY = '';
+    currentKey = null;
+    aiClient = null;
+  }
+
+  public static async testApiKey(apiKey: string): Promise<{ success: boolean; model: string; message: string }> {
+    try {
+      const trimmed = apiKey.trim();
+      if (!trimmed || trimmed === 'MY_GEMINI_API_KEY' || trimmed.length < 10) {
+        return { success: false, model: 'gemini-2.5-flash', message: 'API key is too short or invalid.' };
+      }
+      const client = new GoogleGenAI({
+        apiKey: trimmed,
+        httpOptions: {
+          headers: {
+            'User-Agent': 'aistudio-build'
+          }
+        }
+      });
+      const testPrompt = 'Respond strictly with the single word "VERIFIED".';
+      const response = await client.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: testPrompt
+      });
+      if (response && response.text) {
+        return {
+          success: true,
+          model: 'gemini-2.5-flash',
+          message: 'Gemini API Key successfully verified and connected with model gemini-2.5-flash!'
+        };
+      }
+      return { success: false, model: 'gemini-2.5-flash', message: 'No response received from Gemini API.' };
+    } catch (err: any) {
+      let friendlyMsg = 'Authentication failed: Invalid API key or quota exceeded.';
+      if (err.message) {
+        if (err.message.includes('API key not valid') || err.message.includes('API_KEY_INVALID')) {
+          friendlyMsg = 'API key is not valid. Please verify your Google Gemini API key from Google AI Studio.';
+        } else if (err.message.includes('quota') || err.message.includes('RESOURCE_EXHAUSTED')) {
+          friendlyMsg = 'Gemini API quota exceeded or billing not active for this key.';
+        } else {
+          try {
+            const parsed = JSON.parse(err.message);
+            if (parsed.error?.message) friendlyMsg = parsed.error.message;
+          } catch (_) {
+            friendlyMsg = err.message;
+          }
+        }
+      }
+      return {
+        success: false,
+        model: 'gemini-2.5-flash',
+        message: friendlyMsg
+      };
+    }
+  }
+
+  public static getApiKeyStatus(): { configured: boolean; maskedKey?: string; model: string } {
+    const key = process.env.GEMINI_API_KEY;
+    const configured = Boolean(key && key !== 'MY_GEMINI_API_KEY' && key.trim().length > 10);
+    return {
+      configured,
+      maskedKey: configured ? `${key!.substring(0, 6)}...${key!.substring(key!.length - 4)}` : undefined,
+      model: 'gemini-2.5-flash'
+    };
+  }
+
   private static systemInstruction = `You are an AI assistant for government service documentation.
 Your task is to generate a personalized document checklist.
 
@@ -74,9 +156,10 @@ IMPORTANT RULES:
   public static async analyzeChecklist(
     service: ServiceRecord,
     officialDocuments: DocumentRecord[],
-    citizenData: Record<string, any>
+    citizenData: Record<string, any>,
+    overrideApiKey?: string
   ): Promise<ChecklistResponse> {
-    const ai = getGenAIClient();
+    const ai = getGenAIClient(overrideApiKey);
 
     // If Gemini client cannot be initialized (e.g. key not provided), use safe rule-based fallback
     if (!ai) {
@@ -298,10 +381,15 @@ Analyze the citizen's specific details against each government requirement above
           isMandatory = true;
           customReason = `Required because you indicated living in rented / leased accommodation.`;
         }
-        // Delayed Birth Registration
+        // Delayed Birth or Death Registration
         else if (citizenData.delayedDays && !citizenData.delayedDays.includes('Under 21') && doc.document_name.toLowerCase().includes('magistrate')) {
           isMandatory = true;
-          customReason = `Mandatory because the birth registration is delayed beyond standard 21-day timeline (${citizenData.delayedDays}).`;
+          customReason = `Mandatory because the event registration is delayed beyond standard 21-day timeline (${citizenData.delayedDays}).`;
+        }
+        // Unnatural death post-mortem
+        else if (citizenData.causeOfDeath && citizenData.causeOfDeath.includes('Unnatural') && doc.document_name.toLowerCase().includes('post-mortem')) {
+          isMandatory = true;
+          customReason = `Mandatory due to reported accidental or unnatural circumstances requiring medico-legal clearance.`;
         }
         // Widow Pension Death Certificate
         else if (citizenData.pensionCategory && citizenData.pensionCategory.includes('Widow') && doc.document_name.toLowerCase().includes('death')) {
@@ -319,9 +407,144 @@ Analyze the citizen's specific details against each government requirement above
           customReason = `Required to apply interest subsidy to your existing active bank education loan.`;
         }
         // Disability UDID
-        else if (citizenData.disabilityStatus === 'Yes' && doc.document_name.toLowerCase().includes('disability')) {
+        else if ((citizenData.disabilityStatus === 'Yes' || service.id === 22) && doc.document_name.toLowerCase().includes('disability')) {
           isMandatory = true;
-          customReason = `Required for Persons with Benchmark Disabilities (PwD) quota verification.`;
+          customReason = `Required for Persons with Benchmark Disabilities (PwD) statutory verification.`;
+        }
+        // Severe disability > 80% high support
+        else if (Number(citizenData.disabilityPercentage) >= 80 && doc.document_name.toLowerCase().includes('support')) {
+          isMandatory = true;
+          customReason = `Required for enhanced financial pension grant due to certified >= 80% severe disability.`;
+        }
+        // Tatkaal Passport
+        else if (citizenData.passportScheme === 'Tatkaal' && doc.document_name.toLowerCase().includes('tatkaal')) {
+          isMandatory = true;
+          customReason = `Mandatory affidavit and verification credential required under the Tatkaal urgent passport scheme.`;
+        }
+        // Minor Passport / PAN Assessee
+        else if (citizenData.age && Number(citizenData.age) < 18 && (doc.document_name.toLowerCase().includes('annexure c') || doc.document_name.toLowerCase().includes('representative assessee'))) {
+          isMandatory = true;
+          customReason = `Mandatory for minor applicants under 18 years of age represented by parent or legal guardian.`;
+        }
+        // Passport renewal
+        else if (citizenData.passportApplicationType && citizenData.passportApplicationType.includes('Renewal') && doc.document_name.toLowerCase().includes('old / expired passport')) {
+          isMandatory = true;
+          customReason = `Mandatory for cancellation and re-issuance of existing passport booklet.`;
+        }
+        // Permanent Driving Licence (requires LL)
+        else if (citizenData.dlApplicationType && citizenData.dlApplicationType.includes('Permanent') && doc.document_name.toLowerCase().includes('learner licence')) {
+          isMandatory = true;
+          customReason = `Mandatory: Valid Learner's Licence must be held for at least 30 days before taking the permanent driving test.`;
+        }
+        // Medical Form 1A for DL (age >= 40 or commercial)
+        else if ((Number(citizenData.age) >= 40 || citizenData.dlCategory === 'Transport / Commercial') && doc.document_name.toLowerCase().includes('form 1a')) {
+          isMandatory = true;
+          customReason = `Mandatory medical fitness certification required because age is 40+ or licence is for commercial/transport driving.`;
+        }
+        // Vehicle Hypothecation (Form 34)
+        else if (citizenData.vehicleFinanceStatus && citizenData.vehicleFinanceStatus.includes('Loan') && doc.document_name.toLowerCase().includes('hypothecation')) {
+          isMandatory = true;
+          customReason = `Mandatory Form 34 endorsement because the vehicle is purchased under bank auto loan / finance.`;
+        }
+        // Vehicle Inter-State NOC (Form 28)
+        else if (citizenData.vehicleTransferType && citizenData.vehicleTransferType.includes('Inter-State') && doc.document_name.toLowerCase().includes('form 28')) {
+          isMandatory = true;
+          customReason = `Mandatory No Objection Certificate from previous state RTO for inter-state vehicle transfer.`;
+        }
+        // Ration Card Surrender/Deletion Slip
+        else if (citizenData.rationCardType && citizenData.rationCardType.includes('Relocation') && doc.document_name.toLowerCase().includes('surrender')) {
+          isMandatory = true;
+          customReason = `Mandatory deletion/surrender certificate to prevent duplicate enrolment across civil supply jurisdictions.`;
+        }
+        // PM-KISAN Inherited Land Mutation
+        else if (citizenData.landSuccessionType && citizenData.landSuccessionType.includes('Inherited') && doc.document_name.toLowerCase().includes('mutation')) {
+          isMandatory = true;
+          customReason = `Required to establish lawful genealogical title and mutation of inherited agricultural land.`;
+        }
+        // MSME GSTIN
+        else if (citizenData.isGstLiable === 'Yes' && doc.document_name.toLowerCase().includes('gstin')) {
+          isMandatory = true;
+          customReason = `Mandatory GSTIN certificate because business turnover or activity is liable to GST registration.`;
+        }
+        // MSME Partnership / Company Incorporation
+        else if (citizenData.enterpriseType && citizenData.enterpriseType !== 'Proprietorship' && (doc.document_name.toLowerCase().includes('partnership') || doc.document_name.toLowerCase().includes('incorporation'))) {
+          isMandatory = true;
+          customReason = `Mandatory legal deed/certificate verifying registered status of ${citizenData.enterpriseType}.`;
+        }
+        // Legal Heir NOC from co-heirs
+        else if (citizenData.claimingNoc === 'Yes' && doc.document_name.toLowerCase().includes('no-objection')) {
+          isMandatory = true;
+          customReason = `Required consent affidavits from co-heirs to process claim or pension in single applicant name.`;
+        }
+        // Remarriage divorce / death certificate
+        else if (citizenData.remarriageStatus === 'Yes' && (doc.document_name.toLowerCase().includes('divorce') || doc.document_name.toLowerCase().includes('death certificate of previous'))) {
+          isMandatory = true;
+          customReason = `Statutory legal proof demonstrating dissolution or termination of previous matrimonial union.`;
+        }
+        // Head of Family Aadhaar
+        else if (citizenData.hasOwnAddressProof === 'No' && doc.document_name.toLowerCase().includes('head of family')) {
+          isMandatory = true;
+          customReason = `Required because applicant is verifying address using Head of Family (HoF) relationship endorsement.`;
+        }
+        // Domicile / Nativity Parental Ancestry
+        else if (citizenData.domicileBasis && citizenData.domicileBasis.includes('Ancestry') && (doc.document_name.toLowerCase().includes('parent') || doc.document_name.toLowerCase().includes('ancestry') || doc.document_name.toLowerCase().includes('birth certificate of parent'))) {
+          isMandatory = true;
+          customReason = `Mandatory because domicile is being claimed on the basis of parental ancestry and native lineage.`;
+        }
+        // Non-Creamy Layer 3-year Income Tax Returns
+        else if (citizenData.taxPayerStatus === 'Yes' && (doc.document_name.toLowerCase().includes('tax') || doc.document_name.toLowerCase().includes('itr') || doc.document_name.toLowerCase().includes('salary slip'))) {
+          isMandatory = true;
+          customReason = `Required to determine non-creamy layer ceiling eligibility based on gross parental/family annual income.`;
+        }
+        // EWS Asset Declaration
+        else if (service.id === 31 && (doc.document_name.toLowerCase().includes('asset') || doc.document_name.toLowerCase().includes('property') || doc.document_name.toLowerCase().includes('land'))) {
+          isMandatory = true;
+          customReason = `Statutory EWS requirement: Must verify that family landholding is under 5 acres and residential flat is under 1000 sq ft.`;
+        }
+        // ST Certificate Community Inquiry & Genealogy
+        else if (service.id === 34 && (doc.document_name.toLowerCase().includes('genealogy') || doc.document_name.toLowerCase().includes('anthropological') || doc.document_name.toLowerCase().includes('inquiry') || doc.document_name.toLowerCase().includes('rdo'))) {
+          isMandatory = true;
+          customReason = `Statutory ST requirement: Mandated inquiry by Revenue Divisional Officer (RDO) / Sub-Collector to confirm tribal ethnicity.`;
+        }
+        // Building Plan Approval: High-Rise / Commercial Fire NOC
+        else if (citizenData.buildingType && (citizenData.buildingType.includes('Commercial') || citizenData.buildingType.includes('Multi-Storey') || citizenData.buildingHeightOver15m === 'Yes') && (doc.document_name.toLowerCase().includes('fire') || doc.document_name.toLowerCase().includes('structural'))) {
+          isMandatory = true;
+          customReason = `Mandatory Fire & Rescue Services NOC and Registered Structural Engineer Stability Certificate for high-rise/commercial structures.`;
+        }
+        // Trade Licence Hazardous / Eating Establishment
+        else if (citizenData.tradeCategory && (citizenData.tradeCategory.includes('Food') || citizenData.tradeCategory.includes('Hazardous') || citizenData.tradeCategory.includes('Manufacturing')) && (doc.document_name.toLowerCase().includes('fire') || doc.document_name.toLowerCase().includes('health'))) {
+          isMandatory = true;
+          customReason = `Mandatory health officer sanitation clearance and Fire NOC for food and hazardous trade establishments.`;
+        }
+        // Factory Licence Plant Layout & Boiler NOC
+        else if (service.id === 46 && (doc.document_name.toLowerCase().includes('blueprint') || doc.document_name.toLowerCase().includes('hazardous') || doc.document_name.toLowerCase().includes('pollution'))) {
+          isMandatory = true;
+          customReason = `Mandatory DISH approval for factory premises layout, machine layout, and pollution control consent to operate.`;
+        }
+        // FSSAI Food Business Water Testing & FSMS
+        else if (citizenData.foodBusinessType && (citizenData.foodBusinessType.includes('Manufacturer') || citizenData.foodBusinessType.includes('Processor')) && (doc.document_name.toLowerCase().includes('water') || doc.document_name.toLowerCase().includes('fsms') || doc.document_name.toLowerCase().includes('machinery'))) {
+          isMandatory = true;
+          customReason = `Mandatory NABL accredited lab potable water test report and FSMS plan required for food manufacturing units.`;
+        }
+        // GST Non-Proprietor Authorization / Partnership Deed
+        else if (citizenData.gstEntityConstitution && citizenData.gstEntityConstitution !== 'Proprietorship' && (doc.document_name.toLowerCase().includes('partnership') || doc.document_name.toLowerCase().includes('board') || doc.document_name.toLowerCase().includes('authorization'))) {
+          isMandatory = true;
+          customReason = `Mandatory constitutional deed and Letter of Authorization / Board Resolution for registered partnership/company.`;
+        }
+        // EPFO Demographic Joint Declaration
+        else if (citizenData.epfRequestType && citizenData.epfRequestType.includes('Correction') && doc.document_name.toLowerCase().includes('joint declaration')) {
+          isMandatory = true;
+          customReason = `Mandatory EPFO Joint Declaration Form signed by both employee and authorized employer signatory.`;
+        }
+        // National Scholarship Hosteller Certificate
+        else if (citizenData.studentResidenceType && citizenData.studentResidenceType.includes('Hosteller') && doc.document_name.toLowerCase().includes('hostel')) {
+          isMandatory = true;
+          customReason = `Mandatory warden-attested hostel fee receipt to claim higher hosteller maintenance allowance.`;
+        }
+        // Encumbrance Certificate Extended Search
+        else if (service.id === 38 && doc.document_name.toLowerCase().includes('prior title') && Number(citizenData.ecSearchYears) > 15) {
+          isMandatory = true;
+          customReason = `Mandatory prior link documents required for searches spanning beyond 15 years to trace clean title lineage.`;
         }
         else {
           customReason = `Condition: ${doc.condition_rule}`;
